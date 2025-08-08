@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
-      "noEmit": true,
-      "types": []
+    "noEmit": true,
+    "types": [],
+    "target": "es2015", // 至少es2015或更高版本
+    "lib": ["ES2015", "dom"] // 添加这一行，确保包含es2015和dom库
   },
   "files": [
     "../../Source/Cesium.d.ts"

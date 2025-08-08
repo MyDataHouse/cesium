@@ -5,6 +5,7 @@ import Event from "../Core/Event.js";
 import CesiumMath from "../Core/Math.js";
 import Rectangle from "../Core/Rectangle.js";
 import ImageryLayer from "./ImageryLayer.js";
+import TileCoordinatesMap from "../Custom/TileCoordinatesMap.js";
 
 /**
  * An ordered collection of imagery layers for rendering raster imagery on a {@link Globe} or {@link Cesium3DTileset}.
@@ -67,6 +68,13 @@ Object.defineProperties(ImageryLayerCollection.prototype, {
     },
   },
 });
+
+/**
+ * 获取每次绘制的瓦片编号 经纬度瓦片.
+ * @memberof ImageryLayerCollection.prototype
+ * @type {TileCoordinatesMap}
+ */
+ImageryLayerCollection.prototype.tileCoordinatesMap = new TileCoordinatesMap();
 
 /**
  * Adds a layer to the collection.
@@ -642,4 +650,5 @@ ImageryLayerCollection.prototype._update = function () {
     }
   }
 };
+
 export default ImageryLayerCollection;
