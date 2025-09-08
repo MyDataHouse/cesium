@@ -5,6 +5,7 @@ import Event from "../Core/Event.js";
 import CesiumMath from "../Core/Math.js";
 import Rectangle from "../Core/Rectangle.js";
 import ImageryLayer from "./ImageryLayer.js";
+import TileCoordinatesMap from "../Custom/TileCoordinatesMap.js";
 
 /**
  * An ordered collection of imagery layers for rendering raster imagery on a {@link Globe} or {@link Cesium3DTileset}.
@@ -18,6 +19,7 @@ import ImageryLayer from "./ImageryLayer.js";
  */
 function ImageryLayerCollection() {
   this._layers = [];
+  this._tileCoordinatesMap = new TileCoordinatesMap();
 
   /**
    * An event that is raised when a layer is added to the collection.  Event handlers are passed the layer that
@@ -64,6 +66,19 @@ Object.defineProperties(ImageryLayerCollection.prototype, {
   length: {
     get: function () {
       return this._layers.length;
+    },
+  },
+});
+
+Object.defineProperties(ImageryLayerCollection.prototype, {
+  /**
+   * Gets the number of layers in this collection.
+   * @memberof ImageryLayerCollection.prototype
+   * @type {TileCoordinatesMap}
+   */
+  tileCoordinatesMap: {
+    get: function () {
+      return this._tileCoordinatesMap;
     },
   },
 });

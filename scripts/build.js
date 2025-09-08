@@ -13,6 +13,7 @@ import gulp from "gulp";
 import { rimraf } from "rimraf";
 
 import { mkdirp } from "mkdirp";
+import { fileURLToPath, pathToFileURL } from "url";
 
 // Determines the scope of the workspace packages. If the scope is set to cesium, the workspaces should be @cesium/engine.
 // This should match the scope of the dependencies of the root level package.json.
@@ -611,11 +612,12 @@ const externalResolvePlugin = {
  * @returns {Promise<any>}
  */
 export async function createGalleryList(noDevelopmentGallery) {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const configPath = path.join(
-    import.meta.url,
-    "../../packages/sandcastle/sandcastle.config.js",
+    __dirname,
+    "../packages/sandcastle/sandcastle.config.js",
   );
-  const config = await import(configPath);
+  const config = await import(pathToFileURL(configPath));
   const { root: rootDirectory, gallery, sourceUrl } = config.default;
 
   // Paths are specified relative to the config file

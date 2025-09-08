@@ -1,0 +1,33 @@
+{
+  "name": "cesium",
+  "version": "1.131.0",
+  "keywords": [
+    "3D",
+    "webgl",
+    "geospatial",
+    "map",
+    "globe"
+  ],
+  "module": "./Cesium.esm.js",
+  "types": "./Cesium.d.ts",
+  "exports": {
+    ".": {
+      "types": "./Cesium.d.ts",
+      "import": "./Cesium.esm.js"
+    }
+  },
+  "type": "module",
+  "dependencies": {
+  },
+  "devDependencies": {
+  },
+  "scripts": {
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "workspaces": [
+    "packages/engine",
+    "packages/widgets"
+  ]
+}

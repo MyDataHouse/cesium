@@ -516,6 +516,9 @@ GlobeSurfaceTileProvider.prototype.endUpdate = function (frameState) {
 
   // Add the tile render commands to the command list, sorted by texture count.
   const tilesToRenderByTextureCount = this._tilesToRenderByTextureCount;
+  const TileCoordinatesMap = this._imageryLayers.tileCoordinatesMap;
+  const size = TileCoordinatesMap.tileCoordinates.size;
+  TileCoordinatesMap.tileCoordinates.clear();
   for (
     let textureCountIndex = 0,
       textureCountLength = tilesToRenderByTextureCount.length;
@@ -533,6 +536,10 @@ GlobeSurfaceTileProvider.prototype.endUpdate = function (frameState) {
       ++tileIndex
     ) {
       const tile = tilesToRender[tileIndex];
+      TileCoordinatesMap.tileCoordinates.set(
+        `${tile.x},${tile.y},${tile.level}`,
+        tile,
+      );
       const tileBoundingRegion = tile.data.tileBoundingRegion;
       addDrawCommandsForTile(this, tile, frameState);
       frameState.minimumTerrainHeight = Math.min(
@@ -540,6 +547,10 @@ GlobeSurfaceTileProvider.prototype.endUpdate = function (frameState) {
         tileBoundingRegion.minimumHeight,
       );
     }
+  }
+
+  if (size !== TileCoordinatesMap.tileCoordinates.size) {
+    TileCoordinatesMap.subscribe();
   }
 };
 
