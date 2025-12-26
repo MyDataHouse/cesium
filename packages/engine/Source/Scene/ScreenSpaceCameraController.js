@@ -498,6 +498,11 @@ function reactToInput(
   }
 
   const length = eventTypes.length;
+  // const scene = controller._scene;
+  // const startPosition = new Cartesian2(
+  //   scene.canvas.clientWidth / 2,
+  //   scene.canvas.clientHeight / 2,
+  // );
   for (let i = 0; i < length; ++i) {
     const eventType = eventTypes[i];
     const type = defined(eventType.eventType) ? eventType.eventType : eventType;
@@ -506,8 +511,8 @@ function reactToInput(
     const movement =
       aggregator.isMoving(type, modifier) &&
       aggregator.getMovement(type, modifier);
-    const startPosition = aggregator.getStartMousePosition(type, modifier);
 
+    const startPosition = aggregator.getStartMousePosition(type, modifier);
     if (controller.enableInputs && enabled) {
       if (movement) {
         action(controller, startPosition, movement);
@@ -665,6 +670,7 @@ function handleZoom(
     } else {
       object._useZoomWorldPosition = false;
     }
+    object._useZoomWorldPosition = false;
 
     zoomingOnVector = object._zoomingOnVector = false;
     rotatingZoom = object._rotatingZoom = false;
@@ -2329,7 +2335,6 @@ function zoom3D(controller, startPosition, movement) {
   const cameraUnderground = controller._cameraUnderground;
 
   let windowPosition;
-
   if (cameraUnderground) {
     windowPosition = startPosition;
   } else {
