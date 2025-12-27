@@ -145,6 +145,20 @@ function ScreenSpaceCameraController(scene) {
   this.zoomFactor = 5.0;
 
   /**
+   * 控制是否在缩放，移动，旋转，倾斜时将相机焦点固定在canvas中心
+   * @type {boolean}
+   * @default true
+   */
+  this.focusModelCenter = true;
+
+  /**
+   * 控制是否自动调整 缩放，移动，旋转，倾斜， 速度，距离因子
+   * @type {boolean}
+   * @default true
+   */
+  this.autoFactor = true;
+
+  /**
    * The input that allows the user to pan around the map. This only applies in 2D and Columbus view modes.
    * <p>
    * The type can be a {@link CameraEventType}, <code>undefined</code>, an object with <code>eventType</code>
@@ -498,11 +512,7 @@ function reactToInput(
   }
 
   const length = eventTypes.length;
-  // const scene = controller._scene;
-  // const startPosition = new Cartesian2(
-  //   scene.canvas.clientWidth / 2,
-  //   scene.canvas.clientHeight / 2,
-  // );
+
   for (let i = 0; i < length; ++i) {
     const eventType = eventTypes[i];
     const type = defined(eventType.eventType) ? eventType.eventType : eventType;
@@ -513,6 +523,7 @@ function reactToInput(
       aggregator.getMovement(type, modifier);
 
     const startPosition = aggregator.getStartMousePosition(type, modifier);
+
     if (controller.enableInputs && enabled) {
       if (movement) {
         action(controller, startPosition, movement);
@@ -589,7 +600,25 @@ function handleZoom(
   const maxHeight = object.maximumZoomDistance;
 
   const minDistance = distanceMeasure - minHeight;
+
+  //自动计算缩放因子
+  if (object.autoFactor) {
+    if (distanceMeasure <= 500) {
+      zoomFactor = 0.1;
+    } else if (distanceMeasure <= 1000) {
+      zoomFactor = 0.2;
+    } else if (distanceMeasure <= 3500) {
+      zoomFactor = 0.3;
+    } else if (distanceMeasure <= 6500) {
+      zoomFactor = 1;
+    } else {
+      zoomFactor = 4;
+    }
+  }
+  //自动计算缩放因子结束
+
   let zoomRate = zoomFactor * minDistance;
+
   zoomRate = CesiumMath.clamp(
     zoomRate,
     object._minimumZoomRate,
@@ -661,7 +690,8 @@ function handleZoom(
       );
     }
 
-    if (defined(pickedPosition)) {
+    //可以控制是否一屏幕中心缩放
+    if (!object.focusModelCenter && defined(pickedPosition)) {
       object._useZoomWorldPosition = true;
       object._zoomWorldPosition = Cartesian3.clone(
         pickedPosition,
@@ -670,7 +700,6 @@ function handleZoom(
     } else {
       object._useZoomWorldPosition = false;
     }
-    object._useZoomWorldPosition = false;
 
     zoomingOnVector = object._zoomingOnVector = false;
     rotatingZoom = object._rotatingZoom = false;

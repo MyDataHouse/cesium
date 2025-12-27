@@ -1,7 +1,9 @@
 import { copy } from "fs-extra";
 
 // const path = "./dist";
-const path = "D:\\3map_office\\SDK3.0_DEMO\\_3umap\\assets\\_3umap_basemap";
+// const path = "D:\\3map_office\\SDK3.0_DEMO\\_3umap\\assets\\_3umap_basemap";
+const path =
+  "/Users/ironbull/Documents/project/sdk3.0_-demo/_3umap/assets/_3umap_basemap";
 
 /**
  *@description
