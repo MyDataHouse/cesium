@@ -25,6 +25,81 @@ import SceneMode from "./SceneMode.js";
 import SceneTransforms from "./SceneTransforms.js";
 import TweenCollection from "./TweenCollection.js";
 
+const scratchCenter2 = new Cartesian2();
+/**
+ *@description 辅助函数用于获取地图中心点
+ *@param {ScreenSpaceCameraController} controller
+ *@param {Cartesian2} result
+ *@return void
+ *@MethodAuthor ironbull
+ *@Date 2025-12-27 15:18:59
+ */
+const getCenterPosition = (controller, result) => {
+  const scene = controller._scene;
+  result.x = scene.drawingBufferWidth / scene.pixelRatio / 2;
+  result.y = scene.drawingBufferHeight / scene.pixelRatio / 2;
+  return result;
+};
+
+/**
+ *@description 大半径安全扫描，用于获取地图上的模型位置
+ *@param {Scene} scene
+ *@param {number} range 最大半径
+ *@param {Cartesian3} result 结果
+ *@return void
+ *@MethodAuthor ironbull
+ *@Date 2025-12-28 13:03:23
+ */
+const pickModelPosition = (scene, range = 20, coord, result) => {
+  if (!scene.pickPositionSupported) {
+    return;
+  }
+
+  const scratchCartesian = new Cartesian3();
+  const width = range * 2;
+
+  //范围查询是否有模型
+  const areaPick = scene.pick(coord, width, width);
+  //如果没有模型，直接返回中心点获取到的坐标
+  if (!defined(areaPick)) {
+    return scene.pickPositionWorldCoordinates(coord, scratchCartesian);
+  }
+
+  // ② 极少量候选点（9 个）
+  const offsets = [
+    [0, 0],
+    [range, 0],
+    [-range, 0],
+    [0, range],
+    [0, -range],
+    [range, range],
+    [range, -range],
+    [-range, range],
+    [-range, -range],
+  ];
+
+  const cx = coord.x;
+  const cy = coord.y;
+  const pos = new Cartesian2();
+
+  for (const [dx, dy] of offsets) {
+    pos.x = cx + dx;
+    pos.y = cy + dy;
+
+    const picked = scene.pick(pos);
+    if (!defined(picked)) {
+      continue;
+    }
+
+    const p = scene.pickPositionWorldCoordinates(pos, scratchCartesian);
+    if (defined(p)) {
+      return Cartesian3.clone(p, result);
+    }
+  }
+
+  return scene.pickPositionWorldCoordinates(coord, scratchCartesian);
+};
+
 /**
  * Modifies the camera position and orientation based on mouse input to a canvas.
  * @alias ScreenSpaceCameraController
@@ -138,11 +213,25 @@ function ScreenSpaceCameraController(scene) {
   this.maximumZoomDistance = Number.POSITIVE_INFINITY;
 
   /**
-   * A multiplier for the speed at which the camera will zoom.
+   * 缩放因子 控制缩放速度.
    * @type {number}
-   * @default 5.0
+   * @default 3.0
    */
-  this.zoomFactor = 5.0;
+  this.zoomFactor = 3.0;
+
+  /**
+   * 旋转因子 控制旋转速度.
+   * @type {number}
+   * @default 1.0
+   */
+  this.rotateFactor = 1;
+
+  /**
+   * 平移因子 控制平移速度.
+   * @type {number}
+   * @default 1.0
+   */
+  this.translateFactor = 1;
 
   /**
    * 控制是否在缩放，移动，旋转，倾斜时将相机焦点固定在canvas中心
@@ -152,11 +241,20 @@ function ScreenSpaceCameraController(scene) {
   this.focusModelCenter = true;
 
   /**
-   * 控制是否自动调整 缩放，移动，旋转，倾斜， 速度，距离因子
+   * 控制是否自动调整 缩放速度因子
    * @type {boolean}
    * @default true
    */
   this.autoFactor = true;
+
+  this._isLockViewCoord = false;
+
+  /**
+   * 锁定视角坐标
+   * @type {null | Cartesian2}
+   * @default true
+   */
+  this._lockViewCoord = null;
 
   /**
    * The input that allows the user to pan around the map. This only applies in 2D and Columbus view modes.
@@ -329,8 +427,10 @@ function ScreenSpaceCameraController(scene) {
 
   this._horizontalRotationAxis = undefined;
 
+  this._tiltCenterMousePositionOld = new Cartesian2(-1.0, -1.0);
   this._tiltCenterMousePosition = new Cartesian2(-1.0, -1.0);
   this._tiltCenter = new Cartesian3();
+  this._rotateMousePositionOld = new Cartesian2(-1.0, -1.0);
   this._rotateMousePosition = new Cartesian2(-1.0, -1.0);
   this._rotateStartPosition = new Cartesian3();
   this._strafeStartPosition = new Cartesian3();
@@ -523,7 +623,6 @@ function reactToInput(
       aggregator.getMovement(type, modifier);
 
     const startPosition = aggregator.getStartMousePosition(type, modifier);
-
     if (controller.enableInputs && enabled) {
       if (movement) {
         action(controller, startPosition, movement);
@@ -580,6 +679,15 @@ function handleZoom(
   distanceMeasure,
   unitPositionDotDirection,
 ) {
+  //锁定视图逻辑
+  if (object.lockViewCoord && defined(object._lockViewCoord)) {
+    startPosition = object._lockViewCoord;
+  } else {
+    object._lockViewCoord = object.focusModelCenter
+      ? getCenterPosition(object, scratchCenter2)
+      : startPosition;
+  }
+
   let percentage = 1.0;
   if (defined(unitPositionDotDirection)) {
     percentage = CesiumMath.clamp(
@@ -603,10 +711,14 @@ function handleZoom(
 
   //自动计算缩放因子
   if (object.autoFactor) {
-    if (distanceMeasure <= 500) {
+    if (distanceMeasure <= 100) {
       zoomFactor = 0.1;
-    } else if (distanceMeasure <= 1000) {
+    } else if (distanceMeasure <= 200) {
+      zoomFactor = 0.15;
+    } else if (distanceMeasure <= 500) {
       zoomFactor = 0.2;
+    } else if (distanceMeasure <= 2000) {
+      zoomFactor = 0.25;
     } else if (distanceMeasure <= 3500) {
       zoomFactor = 0.3;
     } else if (distanceMeasure <= 6500) {
@@ -691,7 +803,10 @@ function handleZoom(
     }
 
     //可以控制是否一屏幕中心缩放
-    if (!object.focusModelCenter && defined(pickedPosition)) {
+    if (
+      (object.lockViewCoord && defined(pickedPosition)) ||
+      (!object.focusModelCenter && defined(pickedPosition))
+    ) {
       object._useZoomWorldPosition = true;
       object._zoomWorldPosition = Cartesian3.clone(
         pickedPosition,
@@ -1184,7 +1299,13 @@ function pickPosition(controller, mousePosition, result) {
 
   let depthIntersection;
   if (scene.pickPositionSupported) {
-    depthIntersection = scene.pickPositionWorldCoordinates(
+    // depthIntersection = scene.pickPositionWorldCoordinates(
+    //   mousePosition,
+    //   scratchDepthIntersection,
+    // );
+    depthIntersection = pickModelPosition(
+      scene,
+      20,
       mousePosition,
       scratchDepthIntersection,
     );
@@ -1943,6 +2064,7 @@ function spin3D(controller, startPosition, movement) {
   const camera = scene.camera;
   const cameraUnderground = controller._cameraUnderground;
   let ellipsoid = controller._ellipsoid;
+  let offsetXY;
 
   if (!Matrix4.equals(camera.transform, Matrix4.IDENTITY)) {
     rotate3D(controller, startPosition, movement);
@@ -1953,8 +2075,34 @@ function spin3D(controller, startPosition, movement) {
   let radii;
 
   const up = ellipsoid.geodeticSurfaceNormal(camera.position, scratchLookUp);
+  let oldStartPosition;
 
-  if (Cartesian2.equals(startPosition, controller._rotateMousePosition)) {
+  if (controller.focusModelCenter) {
+    // 原始鼠标位移
+    offsetXY = new Cartesian2();
+    offsetXY.x = movement.endPosition.x - movement.startPosition.x;
+    offsetXY.y = movement.endPosition.y - movement.startPosition.y;
+
+    oldStartPosition = startPosition;
+    startPosition = getCenterPosition(controller, movement.startPosition);
+
+    movement.endPosition.x = startPosition.x + offsetXY.x;
+    movement.endPosition.y = startPosition.y + offsetXY.y;
+  } else {
+    oldStartPosition = startPosition;
+  }
+
+  if (controller.lockViewCoord && defined(controller._lockViewCoord)) {
+    startPosition = controller._lockViewCoord;
+    movement.startPosition = startPosition;
+  } else {
+    controller._lockViewCoord = startPosition;
+  }
+
+  if (
+    controller.lockViewCoord ||
+    Cartesian2.equals(oldStartPosition, controller._rotateMousePositionOld)
+  ) {
     if (controller._looking) {
       look3D(controller, startPosition, movement, up);
     } else if (controller._rotating) {
@@ -1973,7 +2121,7 @@ function spin3D(controller, startPosition, movement) {
       radii = scratchRadii;
       radii.x = radii.y = radii.z = magnitude;
       ellipsoid = Ellipsoid.fromCartesian3(radii, scratchEllipsoid);
-      pan3D(controller, startPosition, movement, ellipsoid);
+      pan3D(controller, startPosition, movement, ellipsoid, offsetXY);
     }
     return;
   }
@@ -2027,9 +2175,10 @@ function spin3D(controller, startPosition, movement) {
         radii = scratchRadii;
         radii.x = radii.y = radii.z = magnitude;
         ellipsoid = Ellipsoid.fromCartesian3(radii, scratchEllipsoid);
-        pan3D(controller, startPosition, movement, ellipsoid);
+        pan3D(controller, startPosition, movement, ellipsoid, offsetXY);
 
         Cartesian3.clone(mousePos, controller._rotateStartPosition);
+        Cartesian3.clone(oldStartPosition, controller._rotateMousePositionOld);
       }
     } else {
       controller._looking = true;
@@ -2044,7 +2193,7 @@ function spin3D(controller, startPosition, movement) {
       ),
     )
   ) {
-    pan3D(controller, startPosition, movement, controller._ellipsoid);
+    pan3D(controller, startPosition, movement, controller._ellipsoid, offsetXY);
     Cartesian3.clone(spin3DPick, controller._rotateStartPosition);
   } else if (height > controller._minimumTrackBallHeight) {
     controller._rotating = true;
@@ -2055,6 +2204,7 @@ function spin3D(controller, startPosition, movement) {
   }
 
   Cartesian2.clone(startPosition, controller._rotateMousePosition);
+  Cartesian3.clone(oldStartPosition, controller._rotateMousePositionOld);
 }
 
 function rotate3D(
@@ -2089,10 +2239,30 @@ function rotate3D(
     rotateRate = controller._minimumRotateRate;
   }
 
+  let rotateFactor = controller.rotateFactor;
+  if (controller.autoFactor) {
+    if (rho <= 200) {
+      rotateFactor = 0.3;
+    } else if (rho <= 500) {
+      rotateFactor = 0.4;
+    } else if (rho <= 2000) {
+      rotateFactor = 0.5;
+    } else if (rho <= 3500) {
+      rotateFactor = 0.6;
+    } else if (rho <= 6500) {
+      rotateFactor = 0.8;
+    } else {
+      rotateFactor = 1;
+    }
+  }
+
   let phiWindowRatio =
-    (movement.startPosition.x - movement.endPosition.x) / canvas.clientWidth;
+    ((movement.startPosition.x - movement.endPosition.x) / canvas.clientWidth) *
+    rotateFactor;
   let thetaWindowRatio =
-    (movement.startPosition.y - movement.endPosition.y) / canvas.clientHeight;
+    ((movement.startPosition.y - movement.endPosition.y) /
+      canvas.clientHeight) *
+    rotateFactor;
   phiWindowRatio = Math.min(phiWindowRatio, controller.maximumMovementRatio);
   thetaWindowRatio = Math.min(
     thetaWindowRatio,
@@ -2114,7 +2284,6 @@ function rotate3D(
   if (!rotateOnlyVertical) {
     camera.rotateRight(deltaPhi);
   }
-
   if (!rotateOnlyHorizontal) {
     camera.rotateUp(deltaTheta);
   }
@@ -2134,9 +2303,37 @@ const pan3DDiffMousePosition = new Cartesian2();
 const pan3DPixelDimensions = new Cartesian2();
 const panRay = new Ray();
 
-function pan3D(controller, startPosition, movement, ellipsoid) {
+function pan3D(controller, startPosition, movement, ellipsoid, offsetXY) {
   const scene = controller._scene;
   const camera = scene.camera;
+
+  const height = ellipsoid.cartesianToCartographic(
+    camera.positionWC,
+    scratchCartographic,
+  ).height;
+
+  let translateFactor = controller.translateFactor;
+  //自动计算平移因子
+  if (controller.autoFactor) {
+    if (height <= 200) {
+      translateFactor = 0.2;
+    } else if (height <= 500) {
+      translateFactor = 0.3;
+    } else if (height <= 2000) {
+      translateFactor = 0.4;
+    } else if (height <= 3500) {
+      translateFactor = 0.5;
+    } else if (height <= 6500) {
+      translateFactor = 0.8;
+    } else {
+      translateFactor = 1;
+    }
+  }
+
+  if (controller.focusModelCenter) {
+    movement.endPosition.x = startPosition.x + offsetXY.x * translateFactor;
+    movement.endPosition.y = startPosition.y + offsetXY.y * translateFactor;
+  }
 
   const startMousePosition = Cartesian2.clone(
     movement.startPosition,
@@ -2146,10 +2343,6 @@ function pan3D(controller, startPosition, movement, ellipsoid) {
     movement.endPosition,
     pan3DEndMousePosition,
   );
-  const height = ellipsoid.cartesianToCartographic(
-    camera.positionWC,
-    scratchCartographic,
-  ).height;
 
   let p0, p1;
 
@@ -2572,18 +2765,31 @@ function tilt3DOnTerrain(controller, startPosition, movement) {
   const scene = controller._scene;
   const camera = scene.camera;
   const cameraUnderground = controller._cameraUnderground;
+  const canvas = scene.canvas;
+
+  let rotatePosition = controller.focusModelCenter
+    ? getCenterPosition(controller, scratchCenter2)
+    : startPosition;
+
+  if (controller.lockViewCoord && defined(controller._lockViewCoord)) {
+    rotatePosition = controller._lockViewCoord;
+  } else {
+    controller._lockViewCoord = rotatePosition;
+  }
 
   let center;
   let ray;
   let intersection;
 
-  if (Cartesian2.equals(startPosition, controller._tiltCenterMousePosition)) {
+  if (
+    controller.lockViewCoord ||
+    Cartesian2.equals(startPosition, controller._tiltCenterMousePositionOld)
+  ) {
     center = Cartesian3.clone(controller._tiltCenter, tilt3DCenter);
   } else {
-    center = pickPosition(controller, startPosition, tilt3DCenter);
-
+    center = pickPosition(controller, rotatePosition, tilt3DCenter);
     if (!defined(center)) {
-      ray = camera.getPickRay(startPosition, tilt3DRay);
+      ray = camera.getPickRay(rotatePosition, tilt3DRay);
       intersection = IntersectionTests.rayEllipsoid(ray, ellipsoid);
       if (!defined(intersection)) {
         const cartographic = ellipsoid.cartesianToCartographic(
@@ -2597,7 +2803,11 @@ function tilt3DOnTerrain(controller, startPosition, movement) {
             tilt3DLookUp,
           );
           look3D(controller, startPosition, movement, up);
-          Cartesian2.clone(startPosition, controller._tiltCenterMousePosition);
+          Cartesian2.clone(rotatePosition, controller._tiltCenterMousePosition);
+          Cartesian2.clone(
+            startPosition,
+            controller._tiltCenterMousePositionOld,
+          );
         }
         return;
       }
@@ -2611,11 +2821,10 @@ function tilt3DOnTerrain(controller, startPosition, movement) {
       getTiltCenterUnderground(controller, ray, center, center);
     }
 
-    Cartesian2.clone(startPosition, controller._tiltCenterMousePosition);
+    Cartesian2.clone(rotatePosition, controller._tiltCenterMousePosition);
+    Cartesian2.clone(startPosition, controller._tiltCenterMousePositionOld);
     Cartesian3.clone(center, controller._tiltCenter);
   }
-
-  const canvas = scene.canvas;
 
   const windowPosition = tilt3DWindowPos;
   windowPosition.x = canvas.clientWidth / 2;
@@ -3129,4 +3338,42 @@ ScreenSpaceCameraController.prototype.destroy = function () {
   this._aggregator = this._aggregator && this._aggregator.destroy();
   return destroyObject(this);
 };
+
+/**
+ * 设置是否锁定视角
+ * @param {boolean} lockViewCoord 是否锁定视角
+ * @returns {boolean} 是否锁定视角 fals标识未设置坐标
+ * @see ScreenSpaceCameraController#setLockViewCoord
+ */
+ScreenSpaceCameraController.prototype.setLockViewCoord = function (
+  lockViewCoord,
+) {
+  if (lockViewCoord && !this._lockViewCoord) {
+    return false;
+  }
+
+  return true;
+};
+
+Object.defineProperties(ScreenSpaceCameraController.prototype, {
+  /**
+   * 是否锁定视角
+   *
+   * @memberof ScreenSpaceCameraController.prototype
+   *
+   * @type {boolean}
+   */
+  lockViewCoord: {
+    get: function () {
+      return this._isLockViewCoord;
+    },
+    set: function (value) {
+      if (value && !this._lockViewCoord) {
+        throw new DeveloperError("lockViewCoord 未设置");
+      }
+      this._isLockViewCoord = value;
+    },
+  },
+});
+
 export default ScreenSpaceCameraController;
