@@ -253,6 +253,16 @@ function ScreenSpaceCameraController(scene) {
    */
   this._lockViewCoord = null;
 
+  /** 记录最后一次保存点时的高度，用来锁定目标时，固定最大缩放因子 */
+  this._lastHeight = Infinity;
+
+  /**
+   * 视角平移缩放旋转改变调动函数
+   * @type {null | function(Cartesian2): void}
+   * @default null
+   */
+  this.onViewChange = null;
+
   /**
    * The input that allows the user to pan around the map. This only applies in 2D and Columbus view modes.
    * <p>
@@ -695,10 +705,14 @@ function handleZoom(
     : 0;
   const maxHeight = object.maximumZoomDistance;
 
-  const minDistance = distanceMeasure - minHeight;
-
   //自动计算缩放因子
   if (object.autoFactor) {
+    if (object.lockViewCoord) {
+      distanceMeasure = Math.min(distanceMeasure, object._lastHeight);
+    } else {
+      object._lastHeight = distanceMeasure;
+    }
+
     if (distanceMeasure <= 100) {
       zoomFactor = 0.1;
     } else if (distanceMeasure <= 200) {
@@ -716,6 +730,8 @@ function handleZoom(
     }
   }
   //自动计算缩放因子结束
+
+  const minDistance = distanceMeasure - minHeight;
 
   let zoomRate = zoomFactor * minDistance;
 
@@ -761,6 +777,7 @@ function handleZoom(
   const sameStartPosition =
     movement.inertiaEnabled ??
     Cartesian2.equals(startPosition, object._zoomMouseStart);
+
   let zoomingOnVector = object._zoomingOnVector;
   let rotatingZoom = object._rotatingZoom;
   let pickedPosition;
@@ -770,6 +787,15 @@ function handleZoom(
       startPosition,
       object._zoomMouseStart,
     );
+
+    const change = object.onViewChange;
+    if (change) {
+      if (object.focusModelCenter) {
+        change(getCenterPosition(object, scratchCenter2));
+      } else {
+        change(startPosition);
+      }
+    }
 
     // When camera transform is set, such as tracking an entity, object._globe will be undefined, and no position should be picked
     if (defined(object._globe) && mode === SceneMode.SCENE2D) {
@@ -783,22 +809,14 @@ function handleZoom(
         pickedPosition.x,
       );
     } else if (defined(object._globe)) {
-      if (object.lockViewCoord && object._lockViewCoord) {
-        pickedPosition = object._lockViewCoord;
-      } else {
-        pickedPosition = pickPosition(
-          object,
-          startPosition,
-          scratchPickCartesian,
-        );
-      }
+      pickedPosition = pickPosition(
+        object,
+        startPosition,
+        scratchPickCartesian,
+      );
     }
 
-    //可以控制是否一屏幕中心缩放
-    if (
-      (object.lockViewCoord && defined(pickedPosition)) ||
-      (!object.focusModelCenter && defined(pickedPosition))
-    ) {
+    if (!object.focusModelCenter && defined(pickedPosition)) {
       object._useZoomWorldPosition = true;
       object._zoomWorldPosition = Cartesian3.clone(
         pickedPosition,
@@ -1092,6 +1110,7 @@ function handleZoom(
       object._zoomWorldPosition,
       scratchZoomOffset,
     );
+
     if (
       mode !== SceneMode.COLUMBUS_VIEW &&
       Cartesian2.equals(startPosition, object._zoomMouseStart) &&
@@ -2088,6 +2107,11 @@ function spin3D(controller, startPosition, movement) {
     oldStartPosition = startPosition;
   }
 
+  const change = controller.onViewChange;
+  if (change) {
+    change(startPosition);
+  }
+
   if (
     controller.lockViewCoord ||
     Cartesian2.equals(oldStartPosition, controller._rotateMousePositionOld)
@@ -2099,6 +2123,14 @@ function spin3D(controller, startPosition, movement) {
     } else if (controller._strafing) {
       continueStrafing(controller, movement);
     } else {
+      if (
+        Cartesian3.magnitude(camera.position) <
+        Cartesian3.magnitude(controller._rotateStartPosition)
+      ) {
+        // Pan action is no longer valid if camera moves below the pan ellipsoid
+        return;
+      }
+
       //锁定位置的话，设置位置
       if (controller.lockViewCoord && controller._lockViewCoord) {
         Cartesian3.clone(
@@ -2107,13 +2139,6 @@ function spin3D(controller, startPosition, movement) {
         );
       }
 
-      if (
-        Cartesian3.magnitude(camera.position) <
-        Cartesian3.magnitude(controller._rotateStartPosition)
-      ) {
-        // Pan action is no longer valid if camera moves below the pan ellipsoid
-        return;
-      }
       magnitude = Cartesian3.magnitude(controller._rotateStartPosition);
       radii = scratchRadii;
       radii.x = radii.y = radii.z = magnitude;
@@ -2275,6 +2300,11 @@ function rotate3D(
     }
   }
 
+  //保存最后一次旋转时的高度，用来锁定目标时，固定最大缩放因子
+  if (!controller.lockViewCoord) {
+    controller._lastHeight = rho;
+  }
+
   let phiWindowRatio =
     ((movement.startPosition.x - movement.endPosition.x) / canvas.clientWidth) *
     rotateFactor;
@@ -2354,6 +2384,10 @@ function pan3D(
     } else {
       translateFactor = 1;
     }
+  }
+
+  if (!controller.lockViewCoord) {
+    controller._lastHeight = height;
   }
 
   if (controller.focusModelCenter) {
@@ -2796,6 +2830,11 @@ function tilt3DOnTerrain(controller, startPosition, movement) {
   const rotatePosition = controller.focusModelCenter
     ? getCenterPosition(controller, scratchCenter2)
     : startPosition;
+
+  const change = controller.onViewChange;
+  if (change) {
+    change(rotatePosition);
+  }
 
   let center;
   let ray;
