@@ -263,8 +263,15 @@ function ScreenSpaceCameraController(scene) {
   this._lastHeight = Infinity;
 
   /**
+   * 视角变化回调函数
+   * @callback ViewChangeCallback
+   * @param {Cartesian2} coord - 坐标参数
+   * @returns {void}
+   */
+
+  /**
    * 视角平移缩放旋转改变调动函数
-   * @type {null | function(Cartesian2): void}
+   * @type {null | ViewChangeCallback}
    * @default null
    */
   this.onViewChange = null;
@@ -2623,7 +2630,8 @@ function zoom3D(controller, startPosition, movement) {
   const cameraUnderground = controller._cameraUnderground;
 
   let windowPosition;
-  if (cameraUnderground) {
+  // 如果没有聚焦模型中心或者相机下underground，那么就使用开始位置
+  if (!controller.focusModelCenter || cameraUnderground) {
     windowPosition = startPosition;
   } else {
     windowPosition = zoomCVWindowPos;
