@@ -9,6 +9,7 @@ Thumbs.db
 .eslintcache
 /Source/Custom/package.json
 /dist
+/CesiumUnminified
 
 /Apps/CesiumViewer/Gallery/gallery-index.js
 

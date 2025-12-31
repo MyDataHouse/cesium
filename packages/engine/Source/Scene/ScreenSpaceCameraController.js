@@ -62,24 +62,30 @@ const pickModelPosition = (scene, range, coord, result) => {
     return scene.pickPositionWorldCoordinates(coord, scratchCartesian);
   }
 
-  // ② 极少量候选点（9 个）
+  // ② 极少量候选点（15 个）
   const offsets = [
-    [0, 0],
-    [range, 0],
-    [-range, 0],
-    [0, range],
-    [0, -range],
-    [range, range],
-    [range, -range],
-    [-range, range],
-    [-range, -range],
+    [0, 0], // 中心点
+    [4, 0], // 右 (从3增加到4)
+    [-4, 0], // 左  (从3增加到4)
+    [0, 4], // 下  (从3增加到4)
+    [0, -4], // 上  (从3增加到4)
+    [5.5, 5.5], // 右下 (从3,3增加到5.5,5.5)
+    [5.5, -5.5], // 右上 (从3,-3增加到5.5,-5.5)
+    [-5.5, 5.5], // 左下 (从-3,3增加到-5.5,5.5)
+    [-5.5, -5.5], // 左上 (从-3,-3增加到-5.5,-5.5)
+    [7, 0], // 更右 (从5增加到7)
+    [-7, 0], // 更左 (从5增加到7)
+    [0, 7], // 更下 (从5增加到7)
+    [0, -7], // 更上 (从5增加到7)
+    [7, 4], // 右偏下 (从5,3增加到7,4)
+    [-7, -4], // 左偏上 (从-5,-3增加到-7,-4)
   ];
 
   const cx = coord.x;
   const cy = coord.y;
   const pos = new Cartesian2();
 
-  for (const [dx, dy] of offsets) {
+  for (const { 0: dx, 1: dy } of offsets) {
     pos.x = cx + dx;
     pos.y = cy + dy;
 
