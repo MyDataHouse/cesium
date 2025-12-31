@@ -76,12 +76,8 @@ const template = [
     to: `${path}/pnpm-workspace.yaml`,
   },
   {
-    from: "./CesiumUnminified/Cesium.js",
-    to: `${path}/CesiumUnminified.js`,
-  },
-  {
-    from: "./CesiumUnminified/Cesium.js.map",
-    to: `${path}/Cesium.js.map`,
+    from: "./CesiumUnminified",
+    to: `${path}/CesiumUnminified`,
   },
 ];
 

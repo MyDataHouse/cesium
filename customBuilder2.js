@@ -14,6 +14,18 @@ const path = "CesiumUnminified";
  */
 const template = [
   {
+    from: "./Build/CesiumUnminified/Workers",
+    to: `${path}/Workers`,
+  },
+  {
+    from: "./Build/CesiumUnminified/ThirdParty",
+    to: `${path}/ThirdParty`,
+  },
+  {
+    from: "./Build/CesiumUnminified/Assets",
+    to: `${path}/Assets`,
+  },
+  {
     from: "./Build/CesiumUnminified/Cesium.js",
     to: `${path}/Cesium.js`,
   },
