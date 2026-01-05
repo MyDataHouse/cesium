@@ -239,9 +239,9 @@ function ScreenSpaceCameraController(scene) {
   /**
    * 控制是否在缩放，移动，旋转，倾斜时将相机焦点固定在canvas中心
    * @type {boolean}
-   * @default true
+   * @default false
    */
-  this.focusModelCenter = true;
+  this.focusModelCenter = false;
 
   /**
    * 控制是否自动调整 缩放速度因子
@@ -254,7 +254,7 @@ function ScreenSpaceCameraController(scene) {
 
   /**
    * 锁定视角坐标
-   * @type {null | Cartesian2}
+   * @type {null | Cartesian3}
    * @default true
    */
   this._lockViewCoord = null;
@@ -2122,7 +2122,16 @@ function spin3D(controller, startPosition, movement) {
 
   const change = controller.onViewChange;
   if (change) {
-    change(startPosition);
+    if (controller.lockViewCoord) {
+      change(
+        SceneTransforms.worldToWindowCoordinates(
+          scene,
+          controller._lockViewCoord,
+        ) || new Cartesian2(-100, -100),
+      );
+    } else {
+      change(startPosition);
+    }
   }
 
   if (
@@ -2847,7 +2856,16 @@ function tilt3DOnTerrain(controller, startPosition, movement) {
 
   const change = controller.onViewChange;
   if (change) {
-    change(rotatePosition);
+    if (controller.lockViewCoord) {
+      change(
+        SceneTransforms.worldToWindowCoordinates(
+          scene,
+          controller._lockViewCoord,
+        ) || new Cartesian2(-100, -100),
+      );
+    } else {
+      change(rotatePosition);
+    }
   }
 
   let center;
@@ -3417,22 +3435,6 @@ ScreenSpaceCameraController.prototype.destroy = function () {
   return destroyObject(this);
 };
 
-/**
- * 设置是否锁定视角
- * @param {boolean} lockViewCoord 是否锁定视角
- * @returns {boolean} 是否锁定视角 fals标识未设置坐标
- * @see ScreenSpaceCameraController#setLockViewCoord
- */
-ScreenSpaceCameraController.prototype.setLockViewCoord = function (
-  lockViewCoord,
-) {
-  if (lockViewCoord && !this._lockViewCoord) {
-    return false;
-  }
-
-  return true;
-};
-
 Object.defineProperties(ScreenSpaceCameraController.prototype, {
   /**
    * 是否锁定视角
@@ -3446,7 +3448,7 @@ Object.defineProperties(ScreenSpaceCameraController.prototype, {
       return this._isLockViewCoord;
     },
     set: function (value) {
-      if (value && !this._lockViewCoord) {
+      if (value && !defined(this._lockViewCoord)) {
         throw new DeveloperError("lockViewCoord 未设置");
       }
       this._isLockViewCoord = value;
