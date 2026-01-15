@@ -726,18 +726,18 @@ function handleZoom(
       object._lastHeight = distanceMeasure;
     }
 
-    if (distanceMeasure <= 100) {
+    if (distanceMeasure <= 0) {
       zoomFactor = 0.1;
-    } else if (distanceMeasure <= 200) {
+    } else if (distanceMeasure <= 50) {
       zoomFactor = 0.15;
-    } else if (distanceMeasure <= 500) {
+    } else if (distanceMeasure <= 100) {
       zoomFactor = 0.2;
-    } else if (distanceMeasure <= 2000) {
-      zoomFactor = 0.25;
-    } else if (distanceMeasure <= 3500) {
-      zoomFactor = 0.3;
-    } else if (distanceMeasure <= 6500) {
+    } else if (distanceMeasure <= 200) {
       zoomFactor = 1;
+    } else if (distanceMeasure <= 500) {
+      zoomFactor = 2;
+    } else if (distanceMeasure <= 1000) {
+      zoomFactor = 3;
     } else {
       zoomFactor = 4;
     }
