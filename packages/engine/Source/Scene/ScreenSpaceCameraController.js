@@ -246,9 +246,9 @@ function ScreenSpaceCameraController(scene) {
   /**
    * 控制是否自动调整 缩放速度因子
    * @type {boolean}
-   * @default true
+   * @default false
    */
-  this.autoFactor = true;
+  this.autoFactor = false;
 
   this._isLockViewCoord = false;
 
