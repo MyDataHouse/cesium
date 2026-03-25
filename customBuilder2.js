@@ -1,4 +1,6 @@
-import { copy } from "fs-extra";
+import pkg from "fs-extra";
+
+const { copy } = pkg;
 
 // const path = "./dist";
 const path = "CesiumUnminified";

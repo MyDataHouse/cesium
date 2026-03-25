@@ -1,4 +1,5 @@
-import { copy } from "fs-extra";
+import pkg from "fs-extra";
+const { copy } = pkg;
 
 // const path = "./dist";
 const path = "D:\\3map_office\\SDK3.0_DEMO\\_3umap\\assets\\_3umap_basemap";
