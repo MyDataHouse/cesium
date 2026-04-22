@@ -63,6 +63,7 @@ const {
   Clearcoat,
   LineStyle,
   Material,
+  Vector,
 } = ModelComponents;
 
 /**
@@ -286,7 +287,6 @@ class GltfLoader extends ResourceLoader {
   /**
    * The cache key of the resource.
    *
-   * @memberof GltfLoader.prototype
    *
    * @type {string}
    * @readonly
@@ -299,7 +299,6 @@ class GltfLoader extends ResourceLoader {
   /**
    * The loaded components.
    *
-   * @memberof GltfLoader.prototype
    *
    * @type {ModelComponents.Components}
    * @readonly
@@ -312,7 +311,6 @@ class GltfLoader extends ResourceLoader {
   /**
    * The loaded glTF json.
    *
-   * @memberof GltfLoader.prototype
    *
    * @type {object}
    * @readonly
@@ -328,7 +326,6 @@ class GltfLoader extends ResourceLoader {
   /**
    * Returns true if textures are loaded separately from the other glTF resources.
    *
-   * @memberof GltfLoader.prototype
    *
    * @type {boolean}
    * @readonly
@@ -341,7 +338,6 @@ class GltfLoader extends ResourceLoader {
   /**
    * true if textures are loaded, useful when incrementallyLoadTextures is true
    *
-   * @memberof GltfLoader.prototype
    *
    * @type {boolean}
    * @readonly
@@ -2214,7 +2210,7 @@ function loadPrimitive(loader, gltfPrimitive, hasInstances, frameState) {
   const extensions = gltfPrimitive.extensions ?? Frozen.EMPTY_OBJECT;
   const meshVectorExtension = extensions.CESIUM_mesh_vector;
   if (defined(meshVectorExtension)) {
-    primitive.meshVector = loadMeshVectorExtension(loader, meshVectorExtension);
+    primitive.vector = loadMeshVectorExtension(loader, meshVectorExtension);
   }
 
   let needsPostProcessing = false;
@@ -2369,26 +2365,28 @@ function loadPrimitiveOutline(loader, outlineExtension) {
   return loadAccessor(loader, accessor, useQuaternion);
 }
 
+/**
+ * Load CESIUM_mesh_vector.
+ * @param {GltfLoader} loader
+ * @param {*} meshVectorExtension
+ * @returns {ModelComponents.Vector}
+ * @ignore
+ */
 function loadMeshVectorExtension(loader, meshVectorExtension) {
   if (!defined(meshVectorExtension)) {
     return undefined;
   }
 
-  const result = {
-    vector: meshVectorExtension.vector,
-    count: meshVectorExtension.count,
-  };
+  const result = new Vector();
+  result.vector = meshVectorExtension.vector;
+  result.count = meshVectorExtension.count;
 
   const accessors = loader.gltfJson.accessors;
   function loadVectorAccessor(accessorId, name) {
     if (!defined(accessorId)) {
       return undefined;
     }
-    const accessor = accessors[accessorId];
-    if (!defined(accessor)) {
-      throw new RuntimeError(`CESIUM_mesh_vector ${name} accessor not found!`);
-    }
-    return loadAccessor(loader, accessor);
+    return loadAccessor(loader, accessors[accessorId]);
   }
 
   result.polygonAttributeOffsets = loadVectorAccessor(

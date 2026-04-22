@@ -25,7 +25,7 @@ import destroyObject from "../Core/destroyObject.js";
 /** @import Cesium3DContentGroup from "./Cesium3DContentGroup.js"; */
 /** @import Cesium3DTile from "./Cesium3DTile.js"; */
 /** @import Cesium3DTileBatchTable from "./Cesium3DTileBatchTable.js"; */
-/** @import Cesium3DTileFeature from "./Cesium3DTileFeature.js"; */
+/** @import Cesium3DTileVectorFeature from "./Cesium3DTileVectorFeature.js";*/
 /** @import Cesium3DTileset from "./Cesium3DTileset.js"; */
 /** @import FrameState from "./FrameState.js"; */
 /** @import ImplicitMetadataView from "./ImplicitMetadataView.js"; */
@@ -45,6 +45,9 @@ const pointMaterial = new BufferPointMaterial();
 const polylineMaterial = new BufferPolylineMaterial();
 /** @ignore */
 const polygonMaterial = new BufferPolygonMaterial();
+
+/** @ignore */
+const scratchTileModelMatrix = new Matrix4();
 
 /**
  * Vector glTF tile content. This path decodes glTF primitives into vector
@@ -72,6 +75,12 @@ class VectorGltf3DTileContent {
     /** @type {Array<BufferPrimitiveCollection<BufferPrimitive>>} */
     this._collections = [];
 
+    /** @type {Array<Matrix4>} */
+    this._collectionLocalMatrices = [];
+
+    /** @type {Map<number, Cesium3DTileVectorFeature>} */
+    this._features = new Map();
+
     /** @type {ImplicitMetadataView} */
     this._metadata = undefined;
     /** @type {Cesium3DContentGroup} */
@@ -84,31 +93,31 @@ class VectorGltf3DTileContent {
     this._ready = false;
 
     /** @type {Matrix4} */
-    this._vectorBaseTransform = Matrix4.clone(Matrix4.IDENTITY);
-    /** @type {Matrix4} */
-    this._computedVectorModelMatrix = Matrix4.clone(Matrix4.IDENTITY);
+    this._modelMatrix = Matrix4.clone(Matrix4.IDENTITY);
   }
 
   get featuresLength() {
-    return this._collections.reduce((totalCount, collection) => {
-      return totalCount + collection.primitiveCount;
-    }, 0);
+    return this._collections.reduce(
+      (acc, collection) => acc + collection.primitiveCount,
+      0,
+    );
   }
 
   get pointsLength() {
     return this._collections
       .filter((collection) => collection instanceof BufferPointCollection)
-      .reduce((totalPoints, collection) => {
-        return totalPoints + collection.primitiveCount;
-      }, 0);
+      .reduce((acc, collection) => acc + collection.primitiveCount, 0);
   }
 
   get trianglesLength() {
-    return this._collections
-      .filter((collection) => collection instanceof BufferPolygonCollection)
-      .reduce((totalPoints, collection) => {
-        return totalPoints + collection.triangleCount;
-      }, 0);
+    return this._collections.reduce((acc, collection) => {
+      if (collection instanceof BufferPolygonCollection) {
+        return acc + collection.triangleCount;
+      } else if (collection instanceof BufferPolylineCollection) {
+        return acc + (collection.vertexCount - collection.primitiveCount) * 2;
+      }
+      return acc;
+    }, 0);
   }
 
   get geometryByteLength() {
@@ -170,20 +179,21 @@ class VectorGltf3DTileContent {
   }
 
   /**
-   * @param {number} _featureId
-   * @returns {Cesium3DTileFeature}
+   * @param {number} featureId
+   * @returns {Cesium3DTileVectorFeature}
    */
-  getFeature(_featureId) {
-    return undefined;
+  getFeature(featureId) {
+    return this._features.get(featureId);
   }
 
   /**
-   * @param {number} _featureId
-   * @param {string} _name
+   * @param {number} featureId
+   * @param {string} name
    * @returns {boolean}
    */
-  hasProperty(_featureId, _name) {
-    return false;
+  hasProperty(featureId, name) {
+    const feature = this.getFeature(featureId);
+    return feature ? feature.hasProperty(name) : false;
   }
 
   /**
@@ -264,18 +274,17 @@ class VectorGltf3DTileContent {
 
     Matrix4.multiplyTransformation(
       this._tile.computedTransform,
-      this._vectorBaseTransform,
-      this._computedVectorModelMatrix,
+      this._modelMatrix,
+      scratchTileModelMatrix,
     );
 
-    for (const collection of this._collections) {
+    for (let i = 0; i < this._collections.length; i++) {
       Matrix4.multiplyTransformation(
-        this._computedVectorModelMatrix,
-        // @ts-expect-error TODO: Find type-safe place to store this.
-        collection._vectorLocalModelMatrix,
-        collection.modelMatrix,
+        scratchTileModelMatrix,
+        this._collectionLocalMatrices[i],
+        this._collections[i].modelMatrix,
       );
-      collection.update(frameState);
+      this._collections[i].update(frameState);
     }
   }
 
@@ -355,36 +364,29 @@ function makeDecodeModelOptions(tileset, tile, content, gltf) {
  * @ignore
  */
 function initializeVectorPrimitives(content) {
-  const model = content._decodeModel;
-
   // @ts-expect-error Requires Model conversion to ES6 class.
-  if (!defined(model) || !defined(model.sceneGraph)) {
-    return;
-  }
+  const components = content._decodeModel.sceneGraph.components;
 
-  // @ts-expect-error Requires Model conversion to ES6 class.
-  const components = model.sceneGraph.components;
   const axisCorrection = ModelUtility.getAxisCorrectionMatrix(
     components.upAxis,
     components.forwardAxis,
     new Matrix4(),
   );
+
   Matrix4.multiplyTransformation(
     components.transform,
     axisCorrection,
-    content._vectorBaseTransform,
+    content._modelMatrix,
   );
 
-  const vectorBuffers = createVectorTileBuffersFromModelComponents(components);
-  if (!defined(vectorBuffers)) {
-    return;
-  }
+  const result = createVectorTileBuffersFromModelComponents(
+    content,
+    components,
+  );
 
-  content._collections = [
-    ...vectorBuffers.points,
-    ...vectorBuffers.polylines,
-    ...vectorBuffers.polygons,
-  ];
+  content._collections = result.collections;
+  content._collectionLocalMatrices = result.collectionLocalMatrices;
+  content._features = result.features;
 }
 
 export default VectorGltf3DTileContent;
