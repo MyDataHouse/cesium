@@ -242,6 +242,19 @@ function ScreenSpaceCameraController(scene) {
    * @default false
    */
   this.focusModelCenter = false;
+  /**
+   * 锁定视角坐标
+   * @type {null | Cartesian3}
+   * @default true
+   */
+  this.lockViewCoord = null;
+
+  /**
+   * 锁定视角
+   * @type {boolean}
+   * @default false
+   */
+  this._isLockViewCoord = false;
 
   /**
    * 视角变化回调函数
@@ -1288,6 +1301,9 @@ function pickPosition(controller, mousePosition, result) {
     //   mousePosition,
     //   scratchDepthIntersection,
     // );
+    if (depthIntersection && !controller.lockView) {
+      controller.lockViewCoord = depthIntersection;
+    }
   }
 
   if (!defined(globe)) {
@@ -3324,5 +3340,26 @@ ScreenSpaceCameraController.prototype.destroy = function () {
   this._aggregator = this._aggregator && this._aggregator.destroy();
   return destroyObject(this);
 };
+
+Object.defineProperties(ScreenSpaceCameraController.prototype, {
+  /**
+   * 是否锁定视角
+   *
+   * @memberof ScreenSpaceCameraController.prototype
+   *
+   * @type {boolean}
+   */
+  lockView: {
+    get: function () {
+      return this._isLockViewCoord;
+    },
+    set: function (value) {
+      if (value && !defined(this.lockViewCoord)) {
+        throw new DeveloperError("lockViewCoord 未设置");
+      }
+      this._isLockViewCoord = value;
+    },
+  },
+});
 
 export default ScreenSpaceCameraController;
