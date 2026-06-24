@@ -243,18 +243,6 @@ function ScreenSpaceCameraController(scene) {
    */
   this.focusModelCenter = false;
 
-  this._isLockViewCoord = false;
-
-  /**
-   * 锁定视角坐标
-   * @type {null | Cartesian3}
-   * @default true
-   */
-  this._lockViewCoord = null;
-
-  /** 记录最后一次保存点时的高度，用来锁定目标时，固定最大缩放因子 */
-  this._lastHeight = Infinity;
-
   /**
    * 视角变化回调函数
    * @callback ViewChangeCallback
@@ -1300,10 +1288,6 @@ function pickPosition(controller, mousePosition, result) {
     //   mousePosition,
     //   scratchDepthIntersection,
     // );
-
-    if (depthIntersection && !controller.lockViewCoord) {
-      controller._lockViewCoord = depthIntersection;
-    }
   }
 
   if (!defined(globe)) {
@@ -2089,22 +2073,10 @@ function spin3D(controller, startPosition, movement) {
 
   const change = controller.onViewChange;
   if (change) {
-    if (controller.lockViewCoord) {
-      change(
-        SceneTransforms.worldToWindowCoordinates(
-          scene,
-          controller._lockViewCoord,
-        ) || new Cartesian2(-100, -100),
-      );
-    } else {
-      change(startPosition);
-    }
+    change(startPosition);
   }
 
-  if (
-    controller.lockViewCoord ||
-    Cartesian2.equals(oldStartPosition, controller._rotateMousePositionOld)
-  ) {
+  if (Cartesian2.equals(oldStartPosition, controller._rotateMousePositionOld)) {
     if (controller._looking) {
       look3D(controller, startPosition, movement, up);
     } else if (controller._rotating) {
@@ -2118,14 +2090,6 @@ function spin3D(controller, startPosition, movement) {
       ) {
         // Pan action is no longer valid if camera moves below the pan ellipsoid
         return;
-      }
-
-      //锁定位置的话，设置位置
-      if (controller.lockViewCoord && controller._lockViewCoord) {
-        Cartesian3.clone(
-          controller._lockViewCoord,
-          controller._rotateStartPosition,
-        );
       }
 
       magnitude = Cartesian3.magnitude(controller._rotateStartPosition);
@@ -2275,11 +2239,6 @@ function rotate3D(
 
   const rotateFactor = controller.rotateFactor;
 
-  //保存最后一次旋转时的高度，用来锁定目标时，固定最大缩放因子
-  if (!controller.lockViewCoord) {
-    controller._lastHeight = rho;
-  }
-
   let phiWindowRatio =
     ((movement.startPosition.x - movement.endPosition.x) / canvas.clientWidth) *
     rotateFactor;
@@ -2345,10 +2304,6 @@ function pan3D(
 
   const translateFactor = controller.translateFactor;
 
-  if (!controller.lockViewCoord) {
-    controller._lastHeight = height;
-  }
-
   if (controller.focusModelCenter) {
     movement.endPosition.x = startPosition.x + offsetXY.x * translateFactor;
     movement.endPosition.y = startPosition.y + offsetXY.y * translateFactor;
@@ -2372,7 +2327,6 @@ function pan3D(
     p0 = Cartesian3.clone(controller._panLastWorldPosition, pan3DP0);
     // Use the last picked world position unless we're starting a new drag
     if (
-      !controller.lockViewCoord &&
       !defined(controller._globe) &&
       !Cartesian2.equalsEpsilon(
         oldStartPosition,
@@ -2807,16 +2761,7 @@ function tilt3DOnTerrain(controller, startPosition, movement) {
 
   const change = controller.onViewChange;
   if (change) {
-    if (controller.lockViewCoord) {
-      change(
-        SceneTransforms.worldToWindowCoordinates(
-          scene,
-          controller._lockViewCoord,
-        ) || new Cartesian2(-100, -100),
-      );
-    } else {
-      change(rotatePosition);
-    }
+    change(rotatePosition);
   }
 
   let center;
@@ -2824,15 +2769,9 @@ function tilt3DOnTerrain(controller, startPosition, movement) {
   let intersection;
 
   if (
-    controller.lockViewCoord ||
     Cartesian2.equals(startPosition, controller._tiltCenterMousePositionOld)
   ) {
-    //判断是否锁定目标位置
-    if (controller.lockViewCoord && controller._lockViewCoord) {
-      center = Cartesian3.clone(controller._lockViewCoord, tilt3DCenter);
-    } else {
-      center = Cartesian3.clone(controller._tiltCenter, tilt3DCenter);
-    }
+    center = Cartesian3.clone(controller._tiltCenter, tilt3DCenter);
   } else {
     center = pickPosition(controller, rotatePosition, tilt3DCenter);
     if (!defined(center)) {
@@ -3385,26 +3324,5 @@ ScreenSpaceCameraController.prototype.destroy = function () {
   this._aggregator = this._aggregator && this._aggregator.destroy();
   return destroyObject(this);
 };
-
-Object.defineProperties(ScreenSpaceCameraController.prototype, {
-  /**
-   * 是否锁定视角
-   *
-   * @memberof ScreenSpaceCameraController.prototype
-   *
-   * @type {boolean}
-   */
-  lockViewCoord: {
-    get: function () {
-      return this._isLockViewCoord;
-    },
-    set: function (value) {
-      if (value && !defined(this._lockViewCoord)) {
-        throw new DeveloperError("lockViewCoord 未设置");
-      }
-      this._isLockViewCoord = value;
-    },
-  },
-});
 
 export default ScreenSpaceCameraController;
