@@ -47,61 +47,61 @@ const getCenterPosition = (controller, result) => {
  *@param {Cartesian3} result 结果
  *@return void
  */
-const pickModelPosition = (scene, range, coord, result) => {
-  if (!scene.pickPositionSupported) {
-    return;
-  }
+// const pickModelPosition = (scene, range, coord, result) => {
+//   if (!scene.pickPositionSupported) {
+//     return;
+//   }
 
-  const scratchCartesian = new Cartesian3();
-  const width = range * 2;
+//   const scratchCartesian = new Cartesian3();
+//   const width = range * 2;
 
-  //范围查询是否有模型
-  const areaPick = scene.pick(coord, width, width);
-  //如果没有模型，直接返回中心点获取到的坐标
-  if (!defined(areaPick)) {
-    return scene.pickPositionWorldCoordinates(coord, scratchCartesian);
-  }
+//   //范围查询是否有模型
+//   const areaPick = scene.pick(coord, width, width);
+//   //如果没有模型，直接返回中心点获取到的坐标
+//   if (!defined(areaPick)) {
+//     return scene.pickPositionWorldCoordinates(coord, scratchCartesian);
+//   }
 
-  // ② 极少量候选点（15 个）
-  const offsets = [
-    [0, 0], // 中心点
-    [4, 0], // 右 (从3增加到4)
-    [-4, 0], // 左  (从3增加到4)
-    [0, 4], // 下  (从3增加到4)
-    [0, -4], // 上  (从3增加到4)
-    [5.5, 5.5], // 右下 (从3,3增加到5.5,5.5)
-    [5.5, -5.5], // 右上 (从3,-3增加到5.5,-5.5)
-    [-5.5, 5.5], // 左下 (从-3,3增加到-5.5,5.5)
-    [-5.5, -5.5], // 左上 (从-3,-3增加到-5.5,-5.5)
-    [7, 0], // 更右 (从5增加到7)
-    [-7, 0], // 更左 (从5增加到7)
-    [0, 7], // 更下 (从5增加到7)
-    [0, -7], // 更上 (从5增加到7)
-    [7, 4], // 右偏下 (从5,3增加到7,4)
-    [-7, -4], // 左偏上 (从-5,-3增加到-7,-4)
-  ];
+//   // ② 极少量候选点（15 个）
+//   const offsets = [
+//     [0, 0], // 中心点
+//     [4, 0], // 右 (从3增加到4)
+//     [-4, 0], // 左  (从3增加到4)
+//     [0, 4], // 下  (从3增加到4)
+//     [0, -4], // 上  (从3增加到4)
+//     [5.5, 5.5], // 右下 (从3,3增加到5.5,5.5)
+//     [5.5, -5.5], // 右上 (从3,-3增加到5.5,-5.5)
+//     [-5.5, 5.5], // 左下 (从-3,3增加到-5.5,5.5)
+//     [-5.5, -5.5], // 左上 (从-3,-3增加到-5.5,-5.5)
+//     [7, 0], // 更右 (从5增加到7)
+//     [-7, 0], // 更左 (从5增加到7)
+//     [0, 7], // 更下 (从5增加到7)
+//     [0, -7], // 更上 (从5增加到7)
+//     [7, 4], // 右偏下 (从5,3增加到7,4)
+//     [-7, -4], // 左偏上 (从-5,-3增加到-7,-4)
+//   ];
 
-  const cx = coord.x;
-  const cy = coord.y;
-  const pos = new Cartesian2();
+//   const cx = coord.x;
+//   const cy = coord.y;
+//   const pos = new Cartesian2();
 
-  for (const { 0: dx, 1: dy } of offsets) {
-    pos.x = cx + dx;
-    pos.y = cy + dy;
+//   for (const { 0: dx, 1: dy } of offsets) {
+//     pos.x = cx + dx;
+//     pos.y = cy + dy;
 
-    const picked = scene.pick(pos);
-    if (!defined(picked)) {
-      continue;
-    }
+//     const picked = scene.pick(pos);
+//     if (!defined(picked)) {
+//       continue;
+//     }
 
-    const p = scene.pickPositionWorldCoordinates(pos, scratchCartesian);
-    if (defined(p)) {
-      return Cartesian3.clone(p, result);
-    }
-  }
+//     const p = scene.pickPositionWorldCoordinates(pos, scratchCartesian);
+//     if (defined(p)) {
+//       return Cartesian3.clone(p, result);
+//     }
+//   }
 
-  return scene.pickPositionWorldCoordinates(coord, scratchCartesian);
-};
+//   return scene.pickPositionWorldCoordinates(coord, scratchCartesian);
+// };
 
 /**
  * Modifies the camera position and orientation based on mouse input to a canvas.
@@ -242,13 +242,6 @@ function ScreenSpaceCameraController(scene) {
    * @default false
    */
   this.focusModelCenter = false;
-
-  /**
-   * 控制是否自动调整 缩放速度因子
-   * @type {boolean}
-   * @default false
-   */
-  this.autoFactor = false;
 
   this._isLockViewCoord = false;
 
@@ -717,32 +710,6 @@ function handleZoom(
     ? object.minimumZoomDistance * percentage
     : 0;
   const maxHeight = object.maximumZoomDistance;
-
-  //自动计算缩放因子
-  if (object.autoFactor) {
-    if (object.lockViewCoord) {
-      distanceMeasure = Math.min(distanceMeasure, object._lastHeight);
-    } else {
-      object._lastHeight = distanceMeasure;
-    }
-
-    if (distanceMeasure <= 0) {
-      zoomFactor = 0.1;
-    } else if (distanceMeasure <= 50) {
-      zoomFactor = 0.15;
-    } else if (distanceMeasure <= 100) {
-      zoomFactor = 0.2;
-    } else if (distanceMeasure <= 200) {
-      zoomFactor = 1;
-    } else if (distanceMeasure <= 500) {
-      zoomFactor = 2;
-    } else if (distanceMeasure <= 1000) {
-      zoomFactor = 3;
-    } else {
-      zoomFactor = 4;
-    }
-  }
-  //自动计算缩放因子结束
 
   const minDistance = distanceMeasure - minHeight;
 
@@ -1323,16 +1290,16 @@ function pickPosition(controller, mousePosition, result) {
 
   let depthIntersection;
   if (scene.pickPositionSupported) {
-    // depthIntersection = scene.pickPositionWorldCoordinates(
-    //   mousePosition,
-    //   scratchDepthIntersection,
-    // );
-    depthIntersection = pickModelPosition(
-      scene,
-      20,
+    depthIntersection = scene.pickPositionWorldCoordinates(
       mousePosition,
       scratchDepthIntersection,
     );
+    // depthIntersection = pickModelPosition(
+    //   scene,
+    //   20,
+    //   mousePosition,
+    //   scratchDepthIntersection,
+    // );
 
     if (depthIntersection && !controller.lockViewCoord) {
       controller._lockViewCoord = depthIntersection;
@@ -2194,6 +2161,7 @@ function spin3D(controller, startPosition, movement) {
     );
 
     if (defined(mousePos)) {
+      // eslint-disable-next-line no-useless-assignment
       let strafing = false;
       const ray = camera.getPickRay(
         movement.startPosition,
@@ -2305,22 +2273,7 @@ function rotate3D(
     rotateRate = controller._minimumRotateRate;
   }
 
-  let rotateFactor = controller.rotateFactor;
-  if (controller.autoFactor) {
-    if (rho <= 200) {
-      rotateFactor = 0.3;
-    } else if (rho <= 500) {
-      rotateFactor = 0.4;
-    } else if (rho <= 2000) {
-      rotateFactor = 0.5;
-    } else if (rho <= 3500) {
-      rotateFactor = 0.6;
-    } else if (rho <= 6500) {
-      rotateFactor = 0.8;
-    } else {
-      rotateFactor = 1;
-    }
-  }
+  const rotateFactor = controller.rotateFactor;
 
   //保存最后一次旋转时的高度，用来锁定目标时，固定最大缩放因子
   if (!controller.lockViewCoord) {
@@ -2390,23 +2343,7 @@ function pan3D(
     scratchCartographic,
   ).height;
 
-  let translateFactor = controller.translateFactor;
-  //自动计算平移因子
-  if (controller.autoFactor) {
-    if (height <= 200) {
-      translateFactor = 0.2;
-    } else if (height <= 500) {
-      translateFactor = 0.3;
-    } else if (height <= 2000) {
-      translateFactor = 0.4;
-    } else if (height <= 3500) {
-      translateFactor = 0.5;
-    } else if (height <= 6500) {
-      translateFactor = 0.8;
-    } else {
-      translateFactor = 1;
-    }
-  }
+  const translateFactor = controller.translateFactor;
 
   if (!controller.lockViewCoord) {
     controller._lastHeight = height;
@@ -2677,6 +2614,7 @@ function zoom3D(controller, startPosition, movement) {
   if (!defined(controller._globe) && defined(distance)) {
     const targetDistance = camera.getMagnitude();
     if (targetDistance < distance) {
+      // eslint-disable-next-line no-useless-assignment
       intersection = undefined;
       distance = undefined;
     }
